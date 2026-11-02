@@ -20,19 +20,19 @@ async function buscarOFallar(id) {
   return mascota;
 }
 
-// GET /api/mascotas?ciudad=Valparaíso&especie=&tamano=&sexo=&esterilizado=&page=&limit=
-// Público. Filtros obligatorios: estado = Disponible (fijo) y ciudad. Opcionales: los otros 4.
+// GET /api/mascotas
 async function listarCatalogo(req, res) {
   const ciudad = leerFiltroTexto(req.query, 'ciudad');
-  if (!ciudad) {
-    throw AppError.badRequest('CIUDAD_REQUERIDA', 'Debes indicar la ciudad para consultar el catálogo');
-  }
+  
+  // Se hace la ciudad opcional para evitar el error 400 (CIUDAD_REQUERIDA)
+  const filtro = { estado: 'Disponible' };
+  if (ciudad) filtro.ciudad = ciudad;
 
-  const filtro = { estado: 'Disponible', ciudad };
   for (const campo of ['especie', 'tamano', 'sexo']) {
     const valor = leerFiltroTexto(req.query, campo);
     if (valor) filtro[campo] = valor;
   }
+
   const esterilizado = leerFiltroBooleano(req.query, 'esterilizado');
   if (esterilizado !== undefined) filtro.esterilizado = esterilizado;
 
@@ -41,16 +41,17 @@ async function listarCatalogo(req, res) {
     Mascota.find(filtro).sort({ fecha_ingreso: -1 }).skip(skip).limit(limit),
     Mascota.countDocuments(filtro),
   ]);
+
   enviarOk(res, 200, { items, paginacion: armarPaginacion(total, page, limit) });
 }
 
-// GET /api/mascotas/ciudades  -> ciudades con mascotas disponibles (para el selector del catálogo)
+// GET /api/mascotas/ciudades
 async function listarCiudades(req, res) {
   const ciudades = await Mascota.distinct('ciudad', { estado: 'Disponible' });
   enviarOk(res, 200, ciudades.sort((a, b) => a.localeCompare(b, 'es')));
 }
 
-// GET /api/mascotas/gestion  (Administrador) -> todas, en cualquier estado
+// GET /api/mascotas/gestion (Administrador)
 async function listarGestion(req, res) {
   const filtro = {};
   for (const campo of ['estado', 'ciudad', 'especie']) {
@@ -65,26 +66,26 @@ async function listarGestion(req, res) {
   enviarOk(res, 200, { items, paginacion: armarPaginacion(total, page, limit) });
 }
 
-// GET /api/mascotas/:id  (ficha de la mascota)
+// GET /api/mascotas/:id
 async function obtener(req, res) {
   enviarOk(res, 200, await buscarOFallar(req.params.id));
 }
 
-// POST /api/mascotas  (Administrador)
+// POST /api/mascotas
 async function crear(req, res) {
   const mascota = await Mascota.create(seleccionar(req.body, CAMPOS_EDITABLES));
   enviarOk(res, 201, mascota, 'Mascota registrada correctamente');
 }
 
-// PUT /api/mascotas/:id  (Administrador)
+// PUT /api/mascotas/:id
 async function actualizar(req, res) {
   const mascota = await buscarOFallar(req.params.id);
   mascota.set(seleccionar(req.body, CAMPOS_EDITABLES));
-  await mascota.save(); // valida y actualiza fecha_modificacion
+  await mascota.save();
   enviarOk(res, 200, mascota, 'Mascota actualizada correctamente');
 }
 
-// PATCH /api/mascotas/:id/estado  (Administrador) body: { "estado": "Adoptada" }
+// PATCH /api/mascotas/:id/estado
 async function cambiarEstado(req, res) {
   const estado = req.body?.estado;
   if (typeof estado !== 'string') {
@@ -99,5 +100,11 @@ async function cambiarEstado(req, res) {
 }
 
 module.exports = {
-  listarCatalogo, listarCiudades, listarGestion, obtener, crear, actualizar, cambiarEstado,
+  listarCatalogo,
+  listarCiudades,
+  listarGestion,
+  obtener,
+  crear,
+  actualizar,
+  cambiarEstado,
 };

@@ -7,7 +7,6 @@ export default function CatalogoPagina() {
   const [mascotas, setMascotas] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [filtros, setFiltros] = useState({
-    estado: 'Disponible',
     ciudad: '',
     especie: '',
     tamano: '',
@@ -19,31 +18,24 @@ export default function CatalogoPagina() {
     setCargando(true);
     try {
       const params = new URLSearchParams();
-      if (filtros.estado) params.append('estado', filtros.estado);
       if (filtros.ciudad) params.append('ciudad', filtros.ciudad);
       if (filtros.especie) params.append('especie', filtros.especie);
       if (filtros.tamano) params.append('tamano', filtros.tamano);
       if (filtros.sexo) params.append('sexo', filtros.sexo);
       if (filtros.esterilizado) params.append('esterilizado', 'true');
 
-      // Si no hay parámetros adicionales, llama a /mascotas limpio
-      const queryString = params.toString();
-      const url = queryString ? `/mascotas?${queryString}` : '/mascotas';
-
-      const res = await api.get(url);
+      const res = await api.get(`/mascotas?${params.toString()}`);
       const datos = res.data;
-      const lista = Array.isArray(datos) ? datos : (datos?.mascotas || datos?.datos || []);
+      
+      // Extrae la lista de la estructura paginada { items: [...] }
+      const lista = Array.isArray(datos)
+        ? datos
+        : (datos?.items || datos?.mascotas || datos?.datos || []);
+
       setMascotas(lista);
     } catch (err) {
       console.error('Error al obtener mascotas:', err);
-      // Fallback: intentar cargar todo sin query params si falla el filtro
-      try {
-        const resFallback = await api.get('/mascotas');
-        const datosFb = resFallback.data;
-        setMascotas(Array.isArray(datosFb) ? datosFb : (datosFb?.mascotas || datosFb?.datos || []));
-      } catch (e) {
-        setMascotas([]);
-      }
+      setMascotas([]);
     } finally {
       setCargando(false);
     }
@@ -64,13 +56,12 @@ export default function CatalogoPagina() {
   return (
     <div style={{ maxWidth: '1100px', margin: '20px auto', padding: '0 20px' }}>
       <div style={{ display: 'flex', gap: '24px' }}>
-        {/* Panel Filtros */}
         <div className="card" style={{ width: '280px', height: 'fit-content' }}>
           <h3 style={{ marginBottom: '16px', fontSize: '14px', textTransform: 'uppercase', color: '#64748b' }}>
             Filtros
           </h3>
 
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '4px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
             Ciudad
           </label>
           <select
@@ -85,8 +76,8 @@ export default function CatalogoPagina() {
             <option value="Santiago">Santiago</option>
           </select>
 
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '4px' }}>
-            Especie
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', marginBottom: '4px' }}>
+            Especie / Animal
           </label>
           <select
             name="especie"
@@ -94,23 +85,29 @@ export default function CatalogoPagina() {
             onChange={handleChange}
             style={{ width: '100%', padding: '8px', marginBottom: '14px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
           >
-            <option value="">Todas</option>
+            <option value="">Todas las especies</option>
             <option value="Perro">Perro</option>
             <option value="Gato">Gato</option>
+            <option value="Conejo">Conejo</option>
+            <option value="Ave">Ave</option>
+            <option value="Otro">Otro</option>
           </select>
         </div>
 
-        {/* Grilla */}
         <div style={{ flex: 1 }}>
-          <h2 style={{ marginBottom: '16px', color: '#1e293b' }}>Catálogo de Mascotas</h2>
+          <h2 style={{ marginBottom: '16px', color: '#1e293b' }}>
+            Catálogo de Mascotas ({mascotas.length})
+          </h2>
 
           {cargando ? (
-            <p style={{ color: '#64748b' }}>Cargando catálogo...</p>
+            <p style={{ color: '#64748b' }}>Cargando datos...</p>
           ) : mascotas.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: '40px 20px' }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>🐾</div>
               <h3>No hay mascotas registradas</h3>
-              <p style={{ color: '#64748b' }}>Crea una nueva mascota desde el Panel Refugio.</p>
+              <p style={{ color: '#64748b', marginTop: '4px' }}>
+                Registra la primera mascota en el <strong>Panel Refugio</strong>.
+              </p>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
