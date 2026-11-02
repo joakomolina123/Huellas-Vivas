@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSesion } from '../Contexto/Sesion.jsx';
+import { useSesion } from '../contexto/Sesion.jsx';
 import { mensajeDeError } from '../conexion/api';
 
 const campo = { width: '100%', padding: '9px', marginBottom: '12px', borderRadius: '6px', border: '1px solid #cbd5e1' };
