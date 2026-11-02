@@ -32,7 +32,9 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: '10kb' }));
+// Aumentar el límite a 10mb para permitir fotografías de mascotas desde la PC en formato Base64
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Health check (Render lo usa para saber si el servicio está vivo)
 app.get('/health', (req, res) => {
