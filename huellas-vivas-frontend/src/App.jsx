@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
-import Catalogo from './pantallas/Catalogo';
+import Catalogo from './pantallas/CatalogoPagina';
 import FichaMascota from './pantallas/FichaMascota';
 import MisSolicitudes from './pantallas/MisSolicitudes';
 
