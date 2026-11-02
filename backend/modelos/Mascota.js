@@ -23,7 +23,7 @@ const mascotaSchema = new mongoose.Schema(
     },
     ciudad: { type: String, required: [true, 'La ciudad es obligatoria'], trim: true, maxlength: 50 },
     esterilizado: { type: Boolean, default: false },
-    foto_url: { type: String, trim: true, default: null }, // Se remueve maxlength: 255 para permitir imágenes Base64
+    foto_url: { type: String, trim: true, default: null },
     estado: {
       type: String,
       enum: { values: ESTADOS, message: 'El estado debe ser Disponible o Adoptada' },
@@ -39,7 +39,7 @@ const mascotaSchema = new mongoose.Schema(
 );
 
 // Índice pensado para el catálogo (filtros obligatorios + orden por fecha) => RNF01
-mascotasSchema.index({ estado: 1, ciudad: 1, fecha_ingreso: -1 });
+mascotaSchema.index({ estado: 1, ciudad: 1, fecha_ingreso: -1 });
 
 module.exports = mongoose.model('Mascota', mascotaSchema);
 module.exports.ESTADOS = ESTADOS;
