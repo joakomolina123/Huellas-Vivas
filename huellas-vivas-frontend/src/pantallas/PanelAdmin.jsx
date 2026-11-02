@@ -25,21 +25,20 @@ export default function PanelAdmin() {
   const cargarDatos = async () => {
     try {
       const resM = await api.get('/mascotas');
-      const datosM = resM.data;
-      const listaMascotas = Array.isArray(datosM) ? datosM : (datosM?.mascotas || datosM?.datos || []);
+      const resObjM = resM.data;
+      const listaMascotas = resObjM?.data?.items || resObjM?.items || resObjM?.mascotas || (Array.isArray(resObjM) ? resObjM : []);
       setMascotas(listaMascotas);
     } catch (err) {
-      console.error('Error al cargar mascotas:', err);
+      console.error('Error al obtener mascotas en panel:', err);
       setMascotas([]);
     }
 
     try {
       const resS = await api.get('/solicitudes');
-      const datosS = resS.data;
-      const listaSolicitudes = Array.isArray(datosS) ? datosS : (datosS?.solicitudes || datosS?.datos || []);
+      const resObjS = resS.data;
+      const listaSolicitudes = resObjS?.data?.items || resObjS?.items || resObjS?.solicitudes || (Array.isArray(resObjS) ? resObjS : []);
       setSolicitudes(listaSolicitudes);
     } catch (err) {
-      console.warn('Solicitudes no accesibles o lista vacía:', err);
       setSolicitudes([]);
     }
   };
@@ -68,39 +67,20 @@ export default function PanelAdmin() {
       };
 
       await api.post('/mascotas', payload);
-      alert('¡Mascota registrada exitosamente en MongoDB Atlas!');
+      alert('¡Mascota guardada con éxito!');
       setModalMascota(false);
       setFormMascota({
         nombre: '', especie: 'Perro', raza: 'Mestizo', sexo: 'Macho', edad_aprox: 1, tamano: 'Mediano', ciudad: 'Valparaíso', estado: 'Disponible', descripcion: '', esterilizado: false, foto_url: ''
       });
       cargarDatos();
     } catch (err) {
-      console.error('Detalle de error al crear mascota:', err.response?.data);
-      const errBackend = err.response?.data;
-      let mensaje = 'Error al conectar con la base de datos para guardar la mascota.';
-
-      if (typeof errBackend === 'string') mensaje = errBackend;
-      else if (errBackend?.mensaje) mensaje = String(errBackend.mensaje);
-      else if (errBackend?.error) mensaje = typeof errBackend.error === 'string' ? errBackend.error : JSON.stringify(errBackend.error);
-
-      setErrorMsj(mensaje);
-    }
-  };
-
-  const cambiarEstadoSolicitud = async (id, nuevoEstado) => {
-    try {
-      await api.patch(`/solicitudes/${id}`, { estado_solicitud: nuevoEstado });
-      cargarDatos();
-    } catch (err) {
-      alert('Error al modificar el estado de la solicitud');
+      setErrorMsj('Error al guardar la mascota en MongoDB.');
     }
   };
 
   return (
     <div style={{ maxWidth: '1000px', margin: '30px auto', padding: '0 20px' }}>
       <div style={{ display: 'flex', gap: '20px' }}>
-        
-        {/* Menú de pestañas */}
         <div style={{ width: '220px' }}>
           <button 
             onClick={() => setTab('mascotas')}
@@ -116,18 +96,17 @@ export default function PanelAdmin() {
           </button>
         </div>
 
-        {/* Contenido principal */}
         <div style={{ flex: 1 }}>
           {tab === 'mascotas' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h2 style={{ fontSize: '22px', color: '#1e293b' }}>Gestión de Mascotas</h2>
+                <h2 style={{ fontSize: '22px', color: '#1e293b' }}>Mascotas en Base de Datos</h2>
                 <button className="btn-primary" onClick={() => { setErrorMsj(''); setModalMascota(true); }}>+ Nueva mascota</button>
               </div>
 
               <div className="card">
                 {mascotas.length === 0 ? (
-                  <p style={{ color: '#64748b', padding: '10px 0' }}>No hay animales registrados. Haz clic en <strong>+ Nueva mascota</strong> para guardar el primero en MongoDB.</p>
+                  <p style={{ color: '#64748b', padding: '10px 0' }}>No hay mascotas registradas.</p>
                 ) : (
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                     <thead>
@@ -140,7 +119,7 @@ export default function PanelAdmin() {
                     </thead>
                     <tbody>
                       {mascotas.map((m, idx) => (
-                        <tr key={m._id || m.id_mascota || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <tr key={m._id || m.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '10px', fontWeight: '600' }}>{m.nombre}</td>
                           <td style={{ padding: '10px' }}>{m.especie}</td>
                           <td style={{ padding: '10px' }}>{m.ciudad || 'Valparaíso'}</td>
@@ -158,20 +137,16 @@ export default function PanelAdmin() {
 
           {tab === 'solicitudes' && (
             <div>
-              <h2 style={{ fontSize: '22px', color: '#1e293b' }}>Solicitudes de Adopción</h2>
+              <h2 style={{ fontSize: '22px', color: '#1e293b' }}>Solicitudes de adopción</h2>
               <div className="card" style={{ marginTop: '16px' }}>
                 {solicitudes.length === 0 ? (
-                  <p style={{ color: '#64748b' }}>No hay solicitudes registradas actualmente.</p>
+                  <p style={{ color: '#64748b' }}>No hay solicitudes de adopción.</p>
                 ) : (
                   solicitudes.map((s, idx) => (
                     <div key={s._id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
                       <div>
                         <strong>{s.id_mascota?.nombre || 'Mascota'}</strong>
-                        <p style={{ fontSize: '13px', color: '#64748b' }}>Postulante: {s.nombre_postulante || 'Usuario interesado'}</p>
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="btn-primary" onClick={() => cambiarEstadoSolicitud(s._id, 'Aprobada')}>Aprobar</button>
-                        <button className="btn-danger" onClick={() => cambiarEstadoSolicitud(s._id, 'Rechazada')}>Rechazar</button>
+                        <p style={{ fontSize: '13px', color: '#64748b' }}>Postulante: {s.nombre_postulante || 'Usuario'}</p>
                       </div>
                     </div>
                   ))
@@ -182,15 +157,14 @@ export default function PanelAdmin() {
         </div>
       </div>
 
-      {/* Modal para ingresar cualquier tipo de mascota */}
       {modalMascota && (
         <div className="modal-overlay">
           <div className="modal-card">
-            <h3 style={{ marginBottom: '14px' }}>Registrar Nueva Mascota</h3>
+            <h3 style={{ marginBottom: '14px' }}>Nueva Mascota</h3>
 
             {Boolean(errorMsj) && (
-              <div style={{ background: '#fee2e2', color: '#991b1b', padding: '10px 12px', borderRadius: '6px', fontSize: '13px', marginBottom: '12px' }}>
-                {String(errorMsj)}
+              <div style={{ background: '#fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', marginBottom: '12px' }}>
+                {errorMsj}
               </div>
             )}
 
@@ -201,8 +175,8 @@ export default function PanelAdmin() {
                   <input type="text" required value={formMascota.nombre} onChange={e => setFormMascota({...formMascota, nombre: e.target.value})} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Especie (Perro, Gato, Conejo, Ave...)</label>
-                  <input type="text" required value={formMascota.especie} onChange={e => setFormMascota({...formMascota, especie: e.target.value})} placeholder="Ej: Conejo, Perro, Gato" style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+                  <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Especie</label>
+                  <input type="text" required value={formMascota.especie} onChange={e => setFormMascota({...formMascota, especie: e.target.value})} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
                 </div>
               </div>
 
@@ -216,27 +190,13 @@ export default function PanelAdmin() {
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Sexo</label>
-                  <select value={formMascota.sexo} onChange={e => setFormMascota({...formMascota, sexo: e.target.value})} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-                    <option value="Macho">Macho</option>
-                    <option value="Hembra">Hembra</option>
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
                   <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Ciudad</label>
                   <select value={formMascota.ciudad} onChange={e => setFormMascota({...formMascota, ciudad: e.target.value})} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
                     <option value="Valparaíso">Valparaíso</option>
                     <option value="Viña del Mar">Viña del Mar</option>
                     <option value="Santiago">Santiago</option>
-                    <option value="Concepción">Concepción</option>
+                    <option value="Quilpué">Quilpué</option>
                   </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Edad aprox. (años)</label>
-                  <input type="number" min="0" value={formMascota.edad_aprox} onChange={e => setFormMascota({...formMascota, edad_aprox: e.target.value})} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
                 </div>
               </div>
 
@@ -247,7 +207,7 @@ export default function PanelAdmin() {
 
               <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                 <button type="button" className="btn-secondary" onClick={() => setModalMascota(false)} style={{ flex: 1 }}>Cancelar</button>
-                <button type="submit" className="btn-primary" style={{ flex: 1 }}>Guardar en MongoDB</button>
+                <button type="submit" className="btn-primary" style={{ flex: 1 }}>Guardar</button>
               </div>
             </form>
           </div>
