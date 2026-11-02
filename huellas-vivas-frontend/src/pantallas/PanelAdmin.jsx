@@ -23,22 +23,27 @@ export default function PanelAdmin() {
 
   const cargarDatos = async () => {
     try {
-      // 1. Cargar mascotas
       const resM = await api.get('/mascotas');
-      const listaMascotas = Array.isArray(resM.data) ? resM.data : (resM.data?.mascotas || resM.data?.datos || []);
+      const datosM = resM.data;
+      const listaMascotas = Array.isArray(datosM)
+        ? datosM
+        : (datosM?.mascotas || datosM?.datos || []);
       setMascotas(listaMascotas);
-
-      // 2. Cargar solicitudes (si falla por 401, asigna lista vacía sin romper el panel)
-      try {
-        const resS = await api.get('/solicitudes');
-        const listaSolicitudes = Array.isArray(resS.data) ? resS.data : (resS.data?.solicitudes || resS.data?.datos || []);
-        setSolicitudes(listaSolicitudes);
-      } catch (errSolicitudes) {
-        console.warn('Solicitudes requiere autenticación previa:', errSolicitudes.response?.status);
-        setSolicitudes([]);
-      }
     } catch (err) {
       console.error('Error al cargar mascotas en el panel:', err);
+      setMascotas([]);
+    }
+
+    try {
+      const resS = await api.get('/solicitudes');
+      const datosS = resS.data;
+      const listaSolicitudes = Array.isArray(datosS)
+        ? datosS
+        : (datosS?.solicitudes || datosS?.datos || []);
+      setSolicitudes(listaSolicitudes);
+    } catch (err) {
+      console.warn('No se pudieron obtener solicitudes:', err);
+      setSolicitudes([]);
     }
   };
 
@@ -52,20 +57,20 @@ export default function PanelAdmin() {
 
     try {
       const payload = {
-        nombre: formMascota.nombre,
-        especie: formMascota.especie,
-        raza: formMascota.raza || 'Mestizo',
-        sexo: formMascota.sexo,
+        nombre: String(formMascota.nombre || '').trim(),
+        especie: String(formMascota.especie || 'Perro'),
+        raza: String(formMascota.raza || 'Mestizo'),
+        sexo: String(formMascota.sexo || 'Macho'),
         edad_aprox: Number(formMascota.edad_aprox) || 1,
-        tamano: formMascota.tamano,
-        ciudad: formMascota.ciudad,
-        estado: formMascota.estado,
-        descripcion: formMascota.descripcion || 'Sin descripción',
+        tamano: String(formMascota.tamano || 'Mediano'),
+        ciudad: String(formMascota.ciudad || 'Valparaíso'),
+        estado: String(formMascota.estado || 'Disponible'),
+        descripcion: String(formMascota.descripcion || 'Sin descripción'),
         esterilizado: Boolean(formMascota.esterilizado)
       };
 
       await api.post('/mascotas', payload);
-      alert('¡Mascota guardada con éxito en MongoDB!');
+      alert('¡Mascota creada exitosamente!');
       setModalMascota(false);
       setFormMascota({
         nombre: '', especie: 'Perro', raza: 'Mestizo', sexo: 'Macho', edad_aprox: 1, tamano: 'Mediano', ciudad: 'Valparaíso', estado: 'Disponible', descripcion: '', esterilizado: false
@@ -73,8 +78,20 @@ export default function PanelAdmin() {
       cargarDatos();
     } catch (err) {
       console.error('Detalle error POST /mascotas:', err.response?.data);
-      const msg = err.response?.data?.mensaje || err.response?.data?.error || 'Error 400/401 al guardar en la base de datos';
-      setErrorMsj(msg);
+
+      let textoError = 'No se pudo guardar la mascota';
+      if (err.response?.data) {
+        const d = err.response.data;
+        if (typeof d === 'string') textoError = d;
+        else if (typeof d.mensaje === 'string') textoError = d.mensaje;
+        else if (typeof d.error === 'string') textoError = d.error;
+        else if (typeof d.message === 'string') textoError = d.message;
+        else textoError = JSON.stringify(d);
+      } else if (err.message) {
+        textoError = err.message;
+      }
+
+      setErrorMsj(String(textoError));
     }
   };
 
@@ -90,34 +107,34 @@ export default function PanelAdmin() {
   return (
     <div style={{ maxWidth: '1000px', margin: '30px auto', padding: '0 20px' }}>
       <div style={{ display: 'flex', gap: '20px' }}>
-        {/* Navegación lateral */}
+        {/* Menú Lateral */}
         <div style={{ width: '220px' }}>
           <button 
             onClick={() => setTab('mascotas')}
             style={{ width: '100%', padding: '12px 14px', textAlign: 'left', borderRadius: '8px', border: 'none', background: tab === 'mascotas' ? '#dbeafe' : '#fff', color: tab === 'mascotas' ? '#1d4ed8' : '#64748b', fontWeight: '600', cursor: 'pointer', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
           >
-            Mascotas ({mascotas.length})
+            Mascotas ({Array.isArray(mascotas) ? mascotas.length : 0})
           </button>
           <button 
             onClick={() => setTab('solicitudes')}
             style={{ width: '100%', padding: '12px 14px', textAlign: 'left', borderRadius: '8px', border: 'none', background: tab === 'solicitudes' ? '#dbeafe' : '#fff', color: tab === 'solicitudes' ? '#1d4ed8' : '#64748b', fontWeight: '600', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
           >
-            Solicitudes <span className="badge badge-pendiente">{solicitudes.length}</span>
+            Solicitudes <span className="badge badge-pendiente">{Array.isArray(solicitudes) ? solicitudes.length : 0}</span>
           </button>
         </div>
 
-        {/* Panel principal */}
+        {/* Panel Central */}
         <div style={{ flex: 1 }}>
           {tab === 'mascotas' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <h2 style={{ fontSize: '22px', color: '#1e293b' }}>Mascotas</h2>
-                <button className="btn-primary" onClick={() => setModalMascota(true)}>+ Nueva mascota</button>
+                <button className="btn-primary" onClick={() => { setErrorMsj(''); setModalMascota(true); }}>+ Nueva mascota</button>
               </div>
 
               <div className="card">
-                {mascotas.length === 0 ? (
-                  <p style={{ color: '#64748b', padding: '10px 0' }}>No hay mascotas registradas en la base de datos. Haz clic en <strong>+ Nueva mascota</strong> para crear la primera.</p>
+                {!Array.isArray(mascotas) || mascotas.length === 0 ? (
+                  <p style={{ color: '#64748b', padding: '10px 0' }}>No hay mascotas registradas. Haz clic en <strong>+ Nueva mascota</strong> para crear una.</p>
                 ) : (
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                     <thead>
@@ -129,10 +146,10 @@ export default function PanelAdmin() {
                       </tr>
                     </thead>
                     <tbody>
-                      {mascotas.map((m) => (
-                        <tr key={m._id || m.id_mascota} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '10px', fontWeight: '600' }}>{m.nombre}</td>
-                          <td style={{ padding: '10px' }}>{m.especie}</td>
+                      {mascotas.map((m, index) => (
+                        <tr key={m._id || m.id_mascota || index} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '10px', fontWeight: '600' }}>{m.nombre || 'Sin nombre'}</td>
+                          <td style={{ padding: '10px' }}>{m.especie || 'Perro'}</td>
                           <td style={{ padding: '10px' }}>{m.ciudad || 'Valparaíso'}</td>
                           <td style={{ padding: '10px' }}>
                             <span className="badge badge-disponible">{m.estado || 'Disponible'}</span>
@@ -150,14 +167,14 @@ export default function PanelAdmin() {
             <div>
               <h2 style={{ fontSize: '22px', color: '#1e293b' }}>Solicitudes de adopción</h2>
               <div className="card" style={{ marginTop: '16px' }}>
-                {solicitudes.length === 0 ? (
-                  <p style={{ color: '#64748b' }}>No hay solicitudes de adopción pendientes.</p>
+                {!Array.isArray(solicitudes) || solicitudes.length === 0 ? (
+                  <p style={{ color: '#64748b' }}>No hay solicitudes registradas.</p>
                 ) : (
-                  solicitudes.map((s) => (
-                    <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
+                  solicitudes.map((s, idx) => (
+                    <div key={s._id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
                       <div>
                         <strong>{s.id_mascota?.nombre || 'Mascota'}</strong>
-                        <p style={{ fontSize: '13px', color: '#64748b' }}>Postulante: {s.nombre_postulante || 'Camila Rojas'}</p>
+                        <p style={{ fontSize: '13px', color: '#64748b' }}>Postulante: {s.nombre_postulante || 'Usuario'}</p>
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <button className="btn-primary" onClick={() => cambiarEstadoSolicitud(s._id, 'Aprobada')}>Aprobar</button>
@@ -172,15 +189,15 @@ export default function PanelAdmin() {
         </div>
       </div>
 
-      {/* Modal para ingresar nueva mascota */}
+      {/* Modal */}
       {modalMascota && (
         <div className="modal-overlay">
           <div className="modal-card">
             <h3 style={{ marginBottom: '14px' }}>Nueva Mascota</h3>
 
-            {errorMsj && (
+            {Boolean(errorMsj) && (
               <div style={{ background: '#fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', marginBottom: '12px' }}>
-                {errorMsj}
+                {String(errorMsj)}
               </div>
             )}
 
