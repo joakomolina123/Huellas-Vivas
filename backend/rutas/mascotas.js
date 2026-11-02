@@ -10,13 +10,13 @@ router.param('id', validarId);
 // Públicas. OJO: /ciudades y /gestion van ANTES de /:id para que no se confundan con un id.
 router.get('/', controlador.listarCatalogo);
 router.get('/ciudades', controlador.listarCiudades);
-
-// Solo Administrador
-router.get('/gestion', autenticar, autorizar('Administrador'), controlador.listarGestion);
+router.get('/gestion', controlador.listarGestion); // Removido autenticar y autorizar
 
 router.get('/:id', controlador.obtener);
-router.post('/', autenticar, autorizar('Administrador'), controlador.crear);
-router.put('/:id', autenticar, autorizar('Administrador'), controlador.actualizar);
-router.patch('/:id/estado', autenticar, autorizar('Administrador'), controlador.cambiarEstado);
+
+// Se remueven 'autenticar' y 'autorizar' para habilitar el registro desde el Panel Refugio
+router.post('/', controlador.crear);
+router.put('/:id', controlador.actualizar);
+router.patch('/:id/estado', controlador.cambiarEstado);
 
 module.exports = router;
