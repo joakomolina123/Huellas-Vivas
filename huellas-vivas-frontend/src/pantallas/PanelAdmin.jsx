@@ -2,37 +2,79 @@ import React, { useState, useEffect } from 'react';
 import api from '../conexion/api';
 
 export default function PanelAdmin() {
-  const [tab, setTab] = useState('mascotas'); // 'mascotas' | 'solicitudes'
+  const [tab, setTab] = useState('mascotas');
   const [mascotas, setMascotas] = useState([]);
   const [solicitudes, setSolicitudes] = useState([]);
   const [modalMascota, setModalMascota] = useState(false);
+  const [errorMsj, setErrorMsj] = useState('');
+
   const [formMascota, setFormMascota] = useState({
-    nombre: '', especie: 'Perro', raza: 'Mestizo', sexo: 'Macho', edad_aprox: 1, tamano: 'Mediano', ciudad: 'Valparaíso', estado: 'Disponible', descripcion: '', esterilizado: false
+    nombre: '',
+    especie: 'Perro',
+    raza: 'Mestizo',
+    sexo: 'Macho',
+    edad_aprox: 1,
+    tamano: 'Mediano',
+    ciudad: 'Valparaíso',
+    estado: 'Disponible',
+    descripcion: '',
+    esterilizado: false
   });
 
   const cargarDatos = async () => {
     try {
+      // 1. Cargar mascotas
       const resM = await api.get('/mascotas');
-      setMascotas(Array.isArray(resM.data) ? resM.data : (resM.data.datos || []));
+      const listaMascotas = Array.isArray(resM.data) ? resM.data : (resM.data?.mascotas || resM.data?.datos || []);
+      setMascotas(listaMascotas);
 
-      const resS = await api.get('/solicitudes');
-      setSolicitudes(Array.isArray(resS.data) ? resS.data : (resS.data.datos || []));
+      // 2. Cargar solicitudes (si falla por 401, asigna lista vacía sin romper el panel)
+      try {
+        const resS = await api.get('/solicitudes');
+        const listaSolicitudes = Array.isArray(resS.data) ? resS.data : (resS.data?.solicitudes || resS.data?.datos || []);
+        setSolicitudes(listaSolicitudes);
+      } catch (errSolicitudes) {
+        console.warn('Solicitudes requiere autenticación previa:', errSolicitudes.response?.status);
+        setSolicitudes([]);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Error al cargar mascotas en el panel:', err);
     }
   };
 
-  useEffect(() => { cargarDatos(); }, []);
+  useEffect(() => {
+    cargarDatos();
+  }, []);
 
   const handleGuardarMascota = async (e) => {
     e.preventDefault();
+    setErrorMsj('');
+
     try {
-      await api.post('/mascotas', formMascota);
-      alert('Mascota guardada con éxito');
+      const payload = {
+        nombre: formMascota.nombre,
+        especie: formMascota.especie,
+        raza: formMascota.raza || 'Mestizo',
+        sexo: formMascota.sexo,
+        edad_aprox: Number(formMascota.edad_aprox) || 1,
+        tamano: formMascota.tamano,
+        ciudad: formMascota.ciudad,
+        estado: formMascota.estado,
+        descripcion: formMascota.descripcion || 'Sin descripción',
+        esterilizado: Boolean(formMascota.esterilizado)
+      };
+
+      await api.post('/mascotas', payload);
+      alert('¡Mascota guardada con éxito en MongoDB!');
       setModalMascota(false);
+      setFormMascota({
+        nombre: '', especie: 'Perro', raza: 'Mestizo', sexo: 'Macho', edad_aprox: 1, tamano: 'Mediano', ciudad: 'Valparaíso', estado: 'Disponible', descripcion: '', esterilizado: false
+      });
       cargarDatos();
     } catch (err) {
-      alert('Error al guardar mascota');
+      console.error('Detalle error POST /mascotas:', err.response?.data);
+      const msg = err.response?.data?.mensaje || err.response?.data?.error || 'Error 400/401 al guardar en la base de datos';
+      setErrorMsj(msg);
     }
   };
 
@@ -41,97 +83,154 @@ export default function PanelAdmin() {
       await api.patch(`/solicitudes/${id}`, { estado_solicitud: nuevoEstado });
       cargarDatos();
     } catch (err) {
-      alert('Error al actualizar solicitud');
+      alert('Error al actualizar la solicitud');
     }
   };
 
   return (
     <div style={{ maxWidth: '1000px', margin: '30px auto', padding: '0 20px' }}>
       <div style={{ display: 'flex', gap: '20px' }}>
-        {/* Menú lateral */}
-        <div style={{ width: '200px' }}>
+        {/* Navegación lateral */}
+        <div style={{ width: '220px' }}>
+          <button 
+            onClick={() => setTab('mascotas')}
+            style={{ width: '100%', padding: '12px 14px', textAlign: 'left', borderRadius: '8px', border: 'none', background: tab === 'mascotas' ? '#dbeafe' : '#fff', color: tab === 'mascotas' ? '#1d4ed8' : '#64748b', fontWeight: '600', cursor: 'pointer', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
+          >
+            Mascotas ({mascotas.length})
+          </button>
           <button 
             onClick={() => setTab('solicitudes')}
-            style={{ width: '100%', padding: '10px 14px', textAlign: 'left', borderRadius: '8px', border: 'none', background: tab === 'solicitudes' ? '#dbeafe' : 'transparent', color: tab === 'solicitudes' ? '#1d4ed8' : '#64748b', fontWeight: '600', cursor: 'pointer', marginBottom: '8px' }}
+            style={{ width: '100%', padding: '12px 14px', textAlign: 'left', borderRadius: '8px', border: 'none', background: tab === 'solicitudes' ? '#dbeafe' : '#fff', color: tab === 'solicitudes' ? '#1d4ed8' : '#64748b', fontWeight: '600', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}
           >
             Solicitudes <span className="badge badge-pendiente">{solicitudes.length}</span>
           </button>
-          <button 
-            onClick={() => setTab('mascotas')}
-            style={{ width: '100%', padding: '10px 14px', textAlign: 'left', borderRadius: '8px', border: 'none', background: tab === 'mascotas' ? '#dbeafe' : 'transparent', color: tab === 'mascotas' ? '#1d4ed8' : '#64748b', fontWeight: '600', cursor: 'pointer' }}
-          >
-            Mascotas
-          </button>
         </div>
 
-        {/* Contenido Principal */}
+        {/* Panel principal */}
         <div style={{ flex: 1 }}>
           {tab === 'mascotas' && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h2>Mascotas</h2>
+                <h2 style={{ fontSize: '22px', color: '#1e293b' }}>Mascotas</h2>
                 <button className="btn-primary" onClick={() => setModalMascota(true)}>+ Nueva mascota</button>
               </div>
 
               <div className="card">
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '13px' }}>
-                      <th style={{ padding: '12px' }}>NOMBRE</th>
-                      <th style={{ padding: '12px' }}>ESPECIE</th>
-                      <th style={{ padding: '12px' }}>CIUDAD</th>
-                      <th style={{ padding: '12px' }}>ESTADO</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mascotas.map((m) => (
-                      <tr key={m._id || m.id_mascota} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '12px', fontWeight: '600' }}>{m.nombre}</td>
-                        <td style={{ padding: '12px' }}>{m.especie}</td>
-                        <td style={{ padding: '12px' }}>{m.ciudad}</td>
-                        <td style={{ padding: '12px' }}><span className={`badge badge-${(m.estado || 'disponible').toLowerCase()}`}>{m.estado || 'Disponible'}</span></td>
+                {mascotas.length === 0 ? (
+                  <p style={{ color: '#64748b', padding: '10px 0' }}>No hay mascotas registradas en la base de datos. Haz clic en <strong>+ Nueva mascota</strong> para crear la primera.</p>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#64748b', fontSize: '12px' }}>
+                        <th style={{ padding: '10px' }}>NOMBRE</th>
+                        <th style={{ padding: '10px' }}>ESPECIE</th>
+                        <th style={{ padding: '10px' }}>CIUDAD</th>
+                        <th style={{ padding: '10px' }}>ESTADO</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {mascotas.map((m) => (
+                        <tr key={m._id || m.id_mascota} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '10px', fontWeight: '600' }}>{m.nombre}</td>
+                          <td style={{ padding: '10px' }}>{m.especie}</td>
+                          <td style={{ padding: '10px' }}>{m.ciudad || 'Valparaíso'}</td>
+                          <td style={{ padding: '10px' }}>
+                            <span className="badge badge-disponible">{m.estado || 'Disponible'}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
           )}
 
           {tab === 'solicitudes' && (
             <div>
-              <h2>Solicitudes de adopción</h2>
+              <h2 style={{ fontSize: '22px', color: '#1e293b' }}>Solicitudes de adopción</h2>
               <div className="card" style={{ marginTop: '16px' }}>
-                {solicitudes.map((s) => (
-                  <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
-                    <div>
-                      <strong>{s.id_mascota?.nombre || 'Mascota'}</strong>
-                      <p style={{ fontSize: '13px', color: '#64748b' }}>Estado: {s.estado_solicitud || 'Pendiente'}</p>
+                {solicitudes.length === 0 ? (
+                  <p style={{ color: '#64748b' }}>No hay solicitudes de adopción pendientes.</p>
+                ) : (
+                  solicitudes.map((s) => (
+                    <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
+                      <div>
+                        <strong>{s.id_mascota?.nombre || 'Mascota'}</strong>
+                        <p style={{ fontSize: '13px', color: '#64748b' }}>Postulante: {s.nombre_postulante || 'Camila Rojas'}</p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="btn-primary" onClick={() => cambiarEstadoSolicitud(s._id, 'Aprobada')}>Aprobar</button>
+                        <button className="btn-danger" onClick={() => cambiarEstadoSolicitud(s._id, 'Rechazada')}>Rechazar</button>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button className="btn-primary" onClick={() => cambiarEstadoSolicitud(s._id, 'Aprobada')}>Aprobar</button>
-                      <button className="btn-danger" onClick={() => cambiarEstadoSolicitud(s._id, 'Rechazada')}>Rechazar</button>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Modal para Crear Mascota */}
+      {/* Modal para ingresar nueva mascota */}
       {modalMascota && (
         <div className="modal-overlay">
           <div className="modal-card">
-            <h3>Nueva Mascota</h3>
-            <form onSubmit={handleGuardarMascota} style={{ marginTop: '16px', display: 'grid', gap: '10px' }}>
-              <input type="text" placeholder="Nombre" required value={formMascota.nombre} onChange={e => setFormMascota({...formMascota, nombre: e.target.value})} style={{ padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-              <select value={formMascota.especie} onChange={e => setFormMascota({...formMascota, especie: e.target.value})} style={{ padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-                <option value="Perro">Perro</option>
-                <option value="Gato">Gato</option>
-              </select>
-              <textarea placeholder="Descripción" value={formMascota.descripcion} onChange={e => setFormMascota({...formMascota, descripcion: e.target.value})} style={{ padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+            <h3 style={{ marginBottom: '14px' }}>Nueva Mascota</h3>
+
+            {errorMsj && (
+              <div style={{ background: '#fee2e2', color: '#991b1b', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', marginBottom: '12px' }}>
+                {errorMsj}
+              </div>
+            )}
+
+            <form onSubmit={handleGuardarMascota} style={{ display: 'grid', gap: '10px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Nombre</label>
+                <input type="text" required value={formMascota.nombre} onChange={e => setFormMascota({...formMascota, nombre: e.target.value})} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Especie</label>
+                  <select value={formMascota.especie} onChange={e => setFormMascota({...formMascota, especie: e.target.value})} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                    <option value="Perro">Perro</option>
+                    <option value="Gato">Gato</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Tamaño</label>
+                  <select value={formMascota.tamano} onChange={e => setFormMascota({...formMascota, tamano: e.target.value})} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                    <option value="Pequeño">Pequeño</option>
+                    <option value="Mediano">Mediano</option>
+                    <option value="Grande">Grande</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Sexo</label>
+                  <select value={formMascota.sexo} onChange={e => setFormMascota({...formMascota, sexo: e.target.value})} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                    <option value="Macho">Macho</option>
+                    <option value="Hembra">Hembra</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Ciudad</label>
+                  <select value={formMascota.ciudad} onChange={e => setFormMascota({...formMascota, ciudad: e.target.value})} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                    <option value="Valparaíso">Valparaíso</option>
+                    <option value="Viña del Mar">Viña del Mar</option>
+                    <option value="Santiago">Santiago</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 'bold' }}>Descripción</label>
+                <textarea rows="2" value={formMascota.descripcion} onChange={e => setFormMascota({...formMascota, descripcion: e.target.value})} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+              </div>
+
               <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                 <button type="button" className="btn-secondary" onClick={() => setModalMascota(false)} style={{ flex: 1 }}>Cancelar</button>
                 <button type="submit" className="btn-primary" style={{ flex: 1 }}>Guardar</button>
