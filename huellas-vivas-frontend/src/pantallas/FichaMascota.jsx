@@ -1,68 +1,87 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '../conexion/api';
+import api, { mensajeDeError } from '../conexion/api';
+import { useSesion } from '../CSesion.jsx';
 
 export default function FichaMascota() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { usuario } = useSesion();
   const [mascota, setMascota] = useState(null);
-  const [showModal, setShowModal] = useState(false);
+  const [mostrarModal, setMostrarModal] = useState(false);
   const [yaPostulado, setYaPostulado] = useState(false);
+  const [aviso, setAviso] = useState(null); // { tipo: 'ok' | 'error', texto }
 
   useEffect(() => {
     api.get(`/mascotas/${id}`)
-      .then((res) => setMascota(res.data.datos || res.data))
-      .catch((err) => console.error(err));
+      .then((res) => setMascota(res.data.data))
+      .catch((err) => setAviso({ tipo: 'error', texto: mensajeDeError(err) }));
   }, [id]);
 
-  const handleConfirmarAdopcion = async () => {
+  // RF10: si ya tiene una solicitud pendiente para esta mascota, el botón queda deshabilitado
+  useEffect(() => {
+    if (usuario?.rol !== 'Usuario') return;
+    api.get('/solicitudes/mias').then((res) => {
+      setYaPostulado(res.data.data.some((s) => s.mascota?.id === id && s.estado_solicitud === 'Pendiente'));
+    }).catch(() => {});
+  }, [usuario, id]);
+
+  const confirmar = async () => {
     try {
-      await api.post('/solicitudes', { id_mascota: id });
-      alert('¡Solicitud enviada con éxito!');
-      setShowModal(false);
+      await api.post('/solicitudes', { mascota: id });
       setYaPostulado(true);
+      setAviso({ tipo: 'ok', texto: '¡Solicitud enviada! Puedes ver su estado en "Mis solicitudes".' });
     } catch (err) {
-      alert(err.response?.data?.mensaje || 'Error al enviar la solicitud');
+      setAviso({ tipo: 'error', texto: mensajeDeError(err) });
+    } finally {
+      setMostrarModal(false);
     }
   };
 
-  if (!mascota) return <div className="container">Cargando...</div>;
+  const postular = () => (usuario ? setMostrarModal(true) : navigate('/acceso'));
+
+  if (!mascota) return <p style={{ padding: 24 }}>{aviso?.texto || 'Cargando...'}</p>;
+
+  const esAdmin = usuario?.rol === 'Administrador';
+  const foto = mascota.foto_url && (mascota.foto_url.startsWith('data:image') || mascota.foto_url.startsWith('http'));
 
   return (
-    <div className="container" style={{ maxWidth: '500px', marginTop: '30px' }}>
-      <button onClick={() => navigate(-1)} className="btn-secondary" style={{ marginBottom: '16px' }}>&larr; Volver</button>
-      
-      <div style={{ border: '1px solid #ddd', borderRadius: '12px', padding: '20px', background: '#fff' }}>
-        <div style={{ height: '220px', background: '#dce8f5', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {mascota.foto_url ? <img src={mascota.foto_url} alt={mascota.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} /> : <span style={{ fontSize: '36px' }}>🐾</span>}
+    <div style={{ maxWidth: 500, margin: '30px auto', padding: '0 20px' }}>
+      <button onClick={() => navigate(-1)} className="btn-secondary" style={{ marginBottom: 16 }}>&larr; Volver</button>
+      <div className="card">
+        <div style={{ height: 220, background: '#dce8f5', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          {foto ? <img src={mascota.foto_url} alt={mascota.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 48 }}>🐾</span>}
         </div>
-        
-        <h2>{mascota.nombre}</h2>
-        <p style={{ color: '#555', fontSize: '14px' }}>
-          {mascota.especie} · {mascota.tamano || 'Mediano'} · {mascota.edad_aprox || '2'} años · {mascota.ciudad}
+        <h2 style={{ marginTop: 12 }}>{mascota.nombre}</h2>
+        <p style={{ color: '#555', fontSize: 14 }}>
+          {mascota.especie} · {mascota.sexo} · {mascota.tamano || 'Tamaño no indicado'} · {mascota.edad_aprox ?? '?'} años · {mascota.ciudad}
+          {mascota.esterilizado ? ' · Esterilizado' : ''}
         </p>
-        <p style={{ margin: '16px 0 24px', lineHeight: '1.5' }}>
-          {mascota.descripcion || 'Juguetón y cariñoso, ideal para familias con espacio para jugar.'}
-        </p>
+        <p style={{ margin: '16px 0 24px', lineHeight: 1.5 }}>{mascota.descripcion || 'Sin descripción.'}</p>
 
-        <button 
-          className="btn-primary" 
-          onClick={() => setShowModal(true)} 
-          disabled={yaPostulado || mascota.estado !== 'Disponible'}
-        >
-          {yaPostulado ? 'Solicitud Pendiente' : 'Solicitar adopción'}
-        </button>
+        {aviso && (
+          <p style={{ marginBottom: 12, padding: 10, borderRadius: 8, fontSize: 14,
+            background: aviso.tipo === 'ok' ? '#dcfce7' : '#fee2e2', color: aviso.tipo === 'ok' ? '#15803d' : '#b91c1c' }}>
+            {aviso.texto}
+          </p>
+        )}
+
+        {!esAdmin && (
+          <button className="btn-primary" style={{ width: '100%' }} onClick={postular}
+            disabled={yaPostulado || mascota.estado !== 'Disponible'}>
+            {mascota.estado !== 'Disponible' ? 'Ya fue adoptada' : yaPostulado ? 'Solicitud pendiente' : 'Solicitar adopción'}
+          </button>
+        )}
       </div>
 
-      {showModal && (
+      {mostrarModal && (
         <div className="modal-overlay">
-          <div className="modal-content">
-            <p style={{ color: '#777', fontSize: '12px', margin: '0' }}>Modal de confirmación</p>
-            <h3 style={{ marginTop: '4px' }}>Confirmar solicitud</h3>
-            <p>¿Deseas solicitar la adopción de <strong>{mascota.nombre}</strong>?</p>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowModal(false)}>Cancelar</button>
-              <button className="btn-primary" style={{ flex: 1 }} onClick={handleConfirmarAdopcion}>Confirmar</button>
+          <div className="modal-card">
+            <h3>Confirmar solicitud</h3>
+            <p style={{ margin: '12px 0' }}>¿Deseas solicitar la adopción de <strong>{mascota.nombre}</strong>?</p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setMostrarModal(false)}>Cancelar</button>
+              <button className="btn-primary" style={{ flex: 1 }} onClick={confirmar}>Confirmar</button>
             </div>
           </div>
         </div>
