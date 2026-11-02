@@ -23,22 +23,25 @@ export default function PanelAdmin() {
   });
 
   const cargarDatos = async () => {
+    // Cargar Mascotas
     try {
       const resM = await api.get('/mascotas');
       const resObjM = resM.data;
       const listaMascotas = resObjM?.data?.items || resObjM?.items || resObjM?.mascotas || (Array.isArray(resObjM) ? resObjM : []);
       setMascotas(listaMascotas);
     } catch (err) {
-      console.error('Error al obtener mascotas en panel:', err);
+      console.error('Error al obtener mascotas en el panel:', err);
       setMascotas([]);
     }
 
+    // Cargar Solicitudes
     try {
       const resS = await api.get('/solicitudes');
       const resObjS = resS.data;
       const listaSolicitudes = resObjS?.data?.items || resObjS?.items || resObjS?.solicitudes || (Array.isArray(resObjS) ? resObjS : []);
       setSolicitudes(listaSolicitudes);
     } catch (err) {
+      console.warn('Solicitudes vacías o con restricción:', err);
       setSolicitudes([]);
     }
   };
@@ -47,22 +50,33 @@ export default function PanelAdmin() {
     cargarDatos();
   }, []);
 
-  // Función para convertir la imagen elegida de la PC a formato Base64
+  // Procesa y comprime automáticamente la foto seleccionada desde la PC
   const handleImagenPC = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      alert('La imagen debe ser menor a 2 MB para guardarse rápidamente.');
-      return;
-    }
-
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setFormMascota((prev) => ({
-        ...prev,
-        foto_url: reader.result // Cadena data:image/... en Base64
-      }));
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 500; // Ancho máximo para optimizar el peso
+        const scaleSize = MAX_WIDTH / img.width;
+
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scaleSize;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        // Genera Base64 ultraligero (JPEG al 70% de calidad)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        setFormMascota((prev) => ({
+          ...prev,
+          foto_url: dataUrl
+        }));
+      };
+      img.src = event.target.result;
     };
     reader.readAsDataURL(file);
   };
@@ -87,22 +101,34 @@ export default function PanelAdmin() {
       };
 
       await api.post('/mascotas', payload);
-      alert('¡Mascota con fotografía registrada con éxito!');
+      alert('¡Mascota guardada exitosamente en MongoDB Atlas!');
       setModalMascota(false);
       setFormMascota({
         nombre: '', especie: 'Perro', raza: 'Mestizo', sexo: 'Macho', edad_aprox: 1, tamano: 'Mediano', ciudad: 'Valparaíso', estado: 'Disponible', descripcion: '', esterilizado: false, foto_url: ''
       });
       cargarDatos();
     } catch (err) {
-      console.error('Error al guardar:', err);
-      setErrorMsj('Error al guardar la mascota en MongoDB Atlas. Intenta con una imagen de menor peso.');
+      console.error('Error al guardar mascota:', err);
+      const backendErr = err.response?.data;
+      const msj = backendErr?.mensaje || backendErr?.error || 'Error al guardar la mascota en MongoDB Atlas.';
+      setErrorMsj(typeof msj === 'string' ? msj : JSON.stringify(msj));
+    }
+  };
+
+  const cambiarEstadoSolicitud = async (id, nuevoEstado) => {
+    try {
+      await api.patch(`/solicitudes/${id}`, { estado_solicitud: nuevoEstado });
+      cargarDatos();
+    } catch (err) {
+      alert('Error al actualizar el estado de la solicitud.');
     }
   };
 
   return (
     <div style={{ maxWidth: '1000px', margin: '30px auto', padding: '0 20px' }}>
       <div style={{ display: 'flex', gap: '20px' }}>
-        {/* Pestañas de Navegación */}
+        
+        {/* Menú Lateral */}
         <div style={{ width: '220px' }}>
           <button 
             onClick={() => setTab('mascotas')}
@@ -118,7 +144,7 @@ export default function PanelAdmin() {
           </button>
         </div>
 
-        {/* Panel Central */}
+        {/* Panel Contenido */}
         <div style={{ flex: 1 }}>
           {tab === 'mascotas' && (
             <div>
@@ -146,7 +172,7 @@ export default function PanelAdmin() {
                         <tr key={m._id || m.id || idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
                           <td style={{ padding: '10px' }}>
                             {m.foto_url ? (
-                              <img src={m.foto_url} alt={m.nombre} style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }} />
+                              <img src={m.foto_url} alt={m.nombre} style={{ width: '38px', height: '38px', borderRadius: '6px', objectFit: 'cover' }} />
                             ) : (
                               '🐾'
                             )}
@@ -168,16 +194,23 @@ export default function PanelAdmin() {
 
           {tab === 'solicitudes' && (
             <div>
-              <h2 style={{ fontSize: '22px', color: '#1e293b' }}>Solicitudes de adopción</h2>
+              <h2 style={{ fontSize: '22px', color: '#1e293b' }}>Solicitudes de Adopción</h2>
               <div className="card" style={{ marginTop: '16px' }}>
                 {solicitudes.length === 0 ? (
-                  <p style={{ color: '#64748b' }}>No hay solicitudes de adopción.</p>
+                  <p style={{ color: '#64748b' }}>No hay solicitudes registradas.</p>
                 ) : (
                   solicitudes.map((s, idx) => (
                     <div key={s._id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
                       <div>
                         <strong>{s.id_mascota?.nombre || 'Mascota'}</strong>
-                        <p style={{ fontSize: '13px', color: '#64748b' }}>Postulante: {s.nombre_postulante || 'Usuario'}</p>
+                        <p style={{ fontSize: '13px', color: '#64748b' }}>Postulante: {s.nombre_postulante || s.nombre || 'Usuario interesado'}</p>
+                        <span className="badge badge-pendiente" style={{ fontSize: '11px', marginTop: '4px', display: 'inline-block' }}>
+                          {s.estado_solicitud || s.estado || 'Pendiente'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="btn-primary" onClick={() => cambiarEstadoSolicitud(s._id, 'Aprobada')}>Aprobar</button>
+                        <button className="btn-danger" onClick={() => cambiarEstadoSolicitud(s._id, 'Rechazada')}>Rechazar</button>
                       </div>
                     </div>
                   ))
@@ -188,7 +221,7 @@ export default function PanelAdmin() {
         </div>
       </div>
 
-      {/* Modal para ingresar mascota con Subida de Imagen desde la PC */}
+      {/* Modal con selector de fotos desde el PC */}
       {modalMascota && (
         <div className="modal-overlay">
           <div className="modal-card">
@@ -201,7 +234,6 @@ export default function PanelAdmin() {
             )}
 
             <form onSubmit={handleGuardarMascota} style={{ display: 'grid', gap: '10px' }}>
-              {/* Botón selector de archivo desde la PC */}
               <div>
                 <label style={{ fontSize: '12px', fontWeight: 'bold', display: 'block', marginBottom: '4px' }}>
                   Seleccionar foto desde tu computador
@@ -214,8 +246,8 @@ export default function PanelAdmin() {
                 />
                 {formMascota.foto_url && (
                   <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <img src={formMascota.foto_url} alt="Vista previa" style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '6px' }} />
-                    <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: '600' }}>✓ Foto cargada</span>
+                    <img src={formMascota.foto_url} alt="Vista previa" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px' }} />
+                    <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: '600' }}>✓ Foto procesada y optimizada</span>
                   </div>
                 )}
               </div>
