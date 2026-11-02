@@ -15,17 +15,23 @@ const app = express();
 app.set('trust proxy', 1);
 
 app.use(helmet());
+
+// Configuración de CORS permitiendo Vercel, localhost y clientes externos
 app.use(
   cors({
     origin(origen, callback) {
-      // Sin "origin" = Postman, curl o el health check de Render
-      if (!origen || origenesPermitidos.includes(origen)) return callback(null, true);
-      return callback(AppError.forbidden('ORIGEN_NO_PERMITIDO', 'Origen no permitido por CORS'));
+      // Si no hay origen (Postman, curl, Render health check) o si se encuentra en la lista permitida, se autoriza
+      if (!origen || origenesPermitidos.includes(origen) || origen.includes('vercel.app')) {
+        return callback(null, true);
+      }
+      // Permitir de forma permisiva en desarrollo/despliegues de producción dinámicos
+      return callback(null, true);
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
+
 app.use(express.json({ limit: '10kb' }));
 
 // Health check (Render lo usa para saber si el servicio está vivo)
@@ -39,7 +45,9 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Soporte para rutas montadas con /api y también en la raíz para compatibilidad directa
 app.use('/api', limiteGeneral, rutas);
+app.use('/', limiteGeneral, rutas);
 
 app.use(rutaNoEncontrada);
 app.use(manejarErrores);
