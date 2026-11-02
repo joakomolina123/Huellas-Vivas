@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api, { mensajeDeError } from '../conexion/api';
-import { useSesion } from '../CSesion.jsx';
+import { useSesion } from '../Contexto/Sesion.jsx';
 
 export default function FichaMascota() {
   const { id } = useParams();
