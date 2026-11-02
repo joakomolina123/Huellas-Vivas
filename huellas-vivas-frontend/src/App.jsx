@@ -1,9 +1,11 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
-import Catalogo from './pantallas/Catalogo';
-import FichaMascota from './pantallas/FichaMascota';
-import MisSolicitudes from './pantallas/MisSolicitudes';
-import PanelAdmin from './pantallas/PanelAdmin';
+
+// Importaciones con los nombres exactos de tu carpeta
+import CatalogoPagina from './pantallas/CatalogoPagina.jsx';
+import FichaMascota from './pantallas/FichaMascota.jsx';
+import MisSolicitudes from './pantallas/MisSolicitudes.jsx';
+import PanelAdmin from './pantallas/PanelAdmin.jsx';
 
 export default function App() {
   return (
@@ -20,7 +22,7 @@ export default function App() {
       </header>
 
       <Routes>
-        <Route path="/" element={<Catalogo />} />
+        <Route path="/" element={<CatalogoPagina />} />
         <Route path="/mascota/:id" element={<FichaMascota />} />
         <Route path="/mis-solicitudes" element={<MisSolicitudes />} />
         <Route path="/admin" element={<PanelAdmin />} />
